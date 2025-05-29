@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, func, Table
-from sqlalchemy.orm import relationship, mapped_column, Mapped, DeclarativeBase
-from sqlalchemy.sql.schema import ForeignKey, PrimaryKeyConstraint
+from sqlalchemy import Integer, String, func
+from sqlalchemy.orm import mapped_column, Mapped, DeclarativeBase
 from sqlalchemy.sql.sqltypes import DateTime
 
 
@@ -20,6 +19,7 @@ class Contact(Base):
         String(100), nullable=False, unique=True)
     phone: Mapped[str] = mapped_column(String(15), nullable=False)
     birthday: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    additional_info: Mapped[str] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
