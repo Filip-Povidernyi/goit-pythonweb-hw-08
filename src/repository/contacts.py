@@ -43,7 +43,6 @@ class ContactRepository:
 
     async def delete_contact(self, contact_id: int) -> ContactModel | None:
         q_contact = await self.get_contact_by_id(contact_id)
-
         if q_contact:
             await self.db.delete(q_contact)
             await self.db.commit()
@@ -69,12 +68,11 @@ class ContactRepository:
             (today + timedelta(days=i)).strftime("%m-%d")
             for i in range((end - today).days + 1)
         ]
-
         birthday_days = func.to_char(Contact.birthday, "MM-DD")
-
         stmt = select(Contact).where(birthday_days.in_(days_range))
         result = await self.db.execute(stmt)
         contacts = result.scalars().all()
+
         return [ContactResponse.model_validate(contact) for contact in contacts]
 
     async def get_contacts_count(self) -> int:
