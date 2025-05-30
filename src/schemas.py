@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 
@@ -9,7 +9,7 @@ class ContactModel(BaseModel):
     last_name: str = Field(max_length=50, min_length=1)
     email: EmailStr
     phone: str = Field(max_length=15, min_length=7)
-    birthday: datetime
+    birthday: date
     additional_info: Optional[str] = Field(max_length=255, default=None)
 
 
@@ -18,12 +18,11 @@ class ContactCreate(ContactModel):
 
 
 class ContactUpdate(ContactModel):
-    name: Optional[str] = Field(max_length=30, min_length=3, default=None)
-    last_name: Optional[str] = Field(max_length=50, min_length=1, default=None)
+    name: Optional[str] = None
+    last_name: Optional[str] = None
     email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(max_length=15, min_length=7, default=None)
-    birthday: Optional[datetime] = None
-    additional_info: Optional[str] = Field(max_length=255, default=None)
+    phone: Optional[str] = None
+    birthday: Optional[date] = None
 
 
 class ContactResponse(ContactModel):
