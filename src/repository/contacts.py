@@ -1,45 +1,45 @@
+from typing import List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 
 from src.database.models import Contact
-from src.schemas import ContactModel
+from src.schemas import ContactModel, ContactResponse, ContactUpdate
 
 
 class ContactRepository:
     def __init__(self, session: AsyncSession):
         self.db = session
 
-    async def get_contacts(self, skip: int = 0, limit: int = 10) -> list[ContactModel]:
+    async def get_contacts(self, skip: int = 0, limit: int = 10) -> List[ContactModel]:
         query = select(Contact).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_contact_by_id(self, contact_id: int) -> ContactModel | None:
+    async def get_contact_by_id(self, contact_id: int) -> ContactResponse | None:
         query = select(Contact).where(Contact.id == contact_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def create_contact(self, contact: ContactModel) -> ContactModel:
-        result = Contact(**contact.model_dump(exclude_unset=True))
+        result = Contact(**contact.model_dump())
         self.db.add(result)
         await self.db.commit()
         await self.db.refresh(result)
-        return result
+        return await self.get_contact_by_id(result.id)
 
-    async def update_contact(self, contact_id: int, contact: ContactModel) -> ContactModel | None:
+    async def update_contact(self, contact_id: int, contact_data: ContactUpdate) -> ContactResponse | None:
         q_contact = await self.get_contact_by_id(contact_id)
 
         if q_contact:
-            q_contact.name = contact.name
-            q_contact.last_name = contact.last_name
-            q_contact.email = contact.email
-            q_contact.phone = contact.phone
-            q_contact.birthday = contact.birthday
+            update_data = contact_data.dict(exclude_unset=True)
+            for field, value in update_data.items():
+                setattr(q_contact, field, value)
+
             await self.db.commit()
             await self.db.refresh(q_contact)
 
-        return q_contact
+        return await self.get_contact_by_id(contact_id)
 
     async def delete_contact(self, contact_id: int) -> ContactModel | None:
         q_contact = await self.get_contact_by_id(contact_id)
@@ -50,25 +50,32 @@ class ContactRepository:
 
         return q_contact
 
-    async def search_contacts(self, query: str) -> list[ContactModel]:
-        stmt = select(Contact).filter(
-            (Contact.name.ilike(f"%{query}%")) |
-            (Contact.last_name.ilike(f"%{query}%")) |
-            (Contact.email.ilike(f"%{query}%"))
+    async def search_contacts(self, query: str) -> List[ContactResponse]:
+
+        stmt = select(Contact).where(
+            (Contact.name.ilike(f'%{query}%')) |
+            (Contact.last_name.ilike(f'%{query}%')) |
+            (Contact.email.ilike(f'%{query}%'))
         )
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        contacts = result.scalars().all()
 
-    async def get_birthdays(self, days: int) -> list[ContactModel]:
+        return [ContactResponse.model_validate(contact) for contact in contacts]
+
+    async def get_birthdays(self, days: int) -> List[ContactResponse]:
         today = datetime.today()
         end = today + timedelta(days=days)
-        stmt = select(Contact).filter(
-            func.extract("month", Contact.birthday) == today.month,
-            func.extract("day", Contact.birthday) >= today.day,
-            func.extract("day", Contact.birthday) <= end.day
-        )
+        days_range = [
+            (today + timedelta(days=i)).strftime("%m-%d")
+            for i in range((end - today).days + 1)
+        ]
+
+        birthday_days = func.to_char(Contact.birthday, "MM-DD")
+
+        stmt = select(Contact).where(birthday_days.in_(days_range))
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        contacts = result.scalars().all()
+        return [ContactResponse.model_validate(contact) for contact in contacts]
 
     async def get_contacts_count(self) -> int:
         result = await self.db.execute(select(func.count()).select_from(Contact))
